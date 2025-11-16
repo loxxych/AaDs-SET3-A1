@@ -1,88 +1,67 @@
 import subprocess
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
-def run_cpp(N, rect_type):
-    """
-    Run Area calculation function (A1.cpp) with parameters:
-    N - number of iterations
-    rect_type - type of rectangle to generate points in (big - "b" or small - "s")
-    """
+import math
+S_exact = 0.25 * math.pi + 1.25 * math.asin(0.8) - 1
 
+def run_cpp(N):
     proc = subprocess.Popen(
-        ["./a1", str(N), rect_type],
+        ["./mc", str(N)],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True
     )
 
-    # values of the circles (taken from task description)
     circles = """1 1 1
-    1.5 2 1.11803399
-    2 1.5 1.11803399
-    """
+1.5 2 1.11803399
+2 1.5 1.11803399
+"""
 
     out, err = proc.communicate(circles)
+    N_val, S_small, S_big = out.strip().split(",")
 
-    return float(out.strip())
-
-
-# Area calculated using calculator and given formula (from the task description)
-# (for relative error)
-EXPECTED_AREA = 0.944517
-
-# Parameters
-Ns = np.array([i for i in range(100, 100000, 500)])
-modes = ["s", "b"]
-
-# Results
-approx_area = {m: [] for m in modes}
-rel_error = {m: [] for m in modes}
+    return int(N_val), float(S_small), float(S_big)
 
 
-# Running program with different parameters
-for mode in modes:
-    for N in Ns:
-        val = run_cpp(int(N), mode)
+Ns = list(range(100, 100001, 500))
 
-        # Adding approximate area to results
-        approx_area[mode].append(val)
+rows = []
+for N in Ns:
+    N_val, S_s, S_b = run_cpp(N)
+    rows.append([N_val, S_s, S_b])
 
-        # Calculating and adding the relative error to results
-        rel_error[mode].append(100 * abs(val - EXPECTED_AREA) / EXPECTED_AREA)
+df = pd.DataFrame(rows, columns=["N", "area_small", "area_big"])
+df.to_csv("results_mc.csv", index=False)
 
 
 # Plotting
-plt.figure(figsize=(7, 5))
-for mode in modes:
-    if mode == "b":
-        rect = "Широкий"
-    else:
-        rect = "Узкий"
-    plt.plot(Ns, approx_area[mode], label=f"Прямоугольник - {rect}")
-
-# Plot of type 1 - approximate area
-plt.axhline(EXPECTED_AREA, color="green", linestyle="--", label="Точная площадь")
-plt.xlabel("N")
-plt.ylabel("Приближенное значение площади")
+# Type 1
+plt.figure(figsize=(10,6))
 plt.title("Изменение приближенного значения площади")
-plt.legend()
-plt.tight_layout()
-plt.show()
-
-# Plot of type 2 - relative error
-plt.figure(figsize=(7, 5))
-for mode in modes:
-    if mode == "b":
-        rect = "Широкий"
-    else:
-        rect = "Узкий"
-    plt.plot(Ns, rel_error[mode], label=f"Прямоугольник - {rect}")
-
+plt.plot(df["N"], df["area_small"], label="Узкий прямоугольник")
+plt.plot(df["N"], df["area_big"], label="Широкий прямоугольник")
+plt.axhline(S_exact, color="black", linestyle="--", label="Точная площадь")
 plt.xlabel("N")
-plt.ylabel("Относительное отклонение (%)")
+plt.ylabel("Оценка площади")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plot_area.png")
+
+# type 2
+df["rel_small"] = abs(df["area_small"] - S_exact) / S_exact
+df["rel_big"]   = abs(df["area_big"] - S_exact) / S_exact
+
+plt.figure(figsize=(10,6))
 plt.title("Зависимость относительного отклонения от N")
+plt.plot(df["N"], df["rel_small"], label="Узкий прямоугольник")
+plt.plot(df["N"], df["rel_big"],   label="Широкий прямоугольник")
+plt.xlabel("N")
+plt.ylabel("Относительное отклонение")
+plt.grid(True)
 plt.legend()
 plt.tight_layout()
-plt.show()
+plt.savefig("plot_relative_error.png")

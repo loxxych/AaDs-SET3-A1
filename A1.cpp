@@ -1,94 +1,86 @@
 #include <iostream>
-#include <cmath>
-#include <cstdlib>
-#include <ctime>
 #include <random>
+#include <vector>
+#include <fstream>
 
 using namespace std;
 
-void generatePointInArea(vector<double>& point,
-                         const double minX, const double maxX,
-                         const double minY, const double maxY) {
-    random_device rd;
-    mt19937 mt(rd());
-    uniform_real_distribution<> xDis(minX, maxX);
-    uniform_real_distribution<> yDis(minY, maxY);
-
-    point[0] = xDis(mt);
-    point[1] = yDis(mt);
+bool isInArea(double x, double y,
+              double x1, double y1, double r1,
+              double x2, double y2, double r2,
+              double x3, double y3, double r3)
+{
+    auto inside = [&](double xc, double yc, double rc){
+        return (x - xc)*(x - xc) + (y - yc)*(y - yc) <= rc*rc;
+    };
+    return inside(x1,y1,r1) && inside(x2,y2,r2) && inside(x3,y3,r3);
 }
 
-bool isInArea(const vector<double>& point, const double& x1, const double&  y1, const double&  r1,
-                      const double&  x2, const double&  y2, const double&  r2,
-                      const double&  x3, const double&  y3, const double&  r3) {
-    const double x = point[0];
-    const double y = point[1];
-
-    const bool isInFirstCircle = (x - x1) * (x - x1) + (y - y1) * (y - y1) <= r1 * r1;
-    const bool isInScndCircle = (x - x2) * (x - x2) + (y - y2) * (y - y2) <= r2 * r2;
-    const bool isInThirdCircle = (x - x3) * (x - x3) + (y - y3) * (y - y3) <= r3 * r3;
-
-    return isInFirstCircle && isInScndCircle && isInThirdCircle;
-}
-
-double monteCarloArea(const double& x1, const double&  y1, const double&  r1,
-                      const double&  x2, const double&  y2, const double&  r2,
-                      const double&  x3, const double&  y3, const double&  r3,
-                      const long long N,
-                      const double minX, const double maxX,
-                      const double minY, const double maxY) {
-    vector<double> point(2);
+double monteCarlo(double x1,double y1,double r1,
+                  double x2,double y2,double r2,
+                  double x3,double y3,double r3,
+                  long long N,
+                  double minX,double maxX,
+                  double minY,double maxY)
+{
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_real_distribution<> dx(minX,maxX);
+    std::uniform_real_distribution<> dy(minY,maxY);
 
     long long M = 0;
 
-    for (size_t i = 0; i < N; ++i) {
-        generatePointInArea(point, minX, maxX, minY, maxY);
-        if (isInArea(point, x1, y1, r1, x2, y2, r2, x3, y3, r3)) {
-            ++M;
-        }
+    for (long long i=0; i<N; i++) {
+        double x = dx(mt);
+        double y = dy(mt);
+
+        if (isInArea(x,y,x1,y1,r1,x2,y2,r2,x3,y3,r3))
+            M++;
     }
 
-    return (double(M) / double(N)) * (maxX - minX) * (maxY - minY);
+    return double(M)/N * (maxX - minX) * (maxY - minY);
 }
 
-int main(int argc, char** argv)
+int main(int argc,char** argv)
 {
-    ios::sync_with_stdio(false);
+    long long N = 10000;
 
-    long long N = 1000000;
-    double minX = 0, maxX = 3.15, minY = 0, maxY = 3.15;
-
-    if (argc > 1) {
-        // Arg 1 - number of iterations
+    if (argc > 1)
         N = atoll(argv[1]);
-    }
 
-    if (argc > 2) {
-        // Arg 2 - sets the rectangle for point generation
-        // s - small rectangle, b - big rectangle
-        if (argv[2] == "s") { // small rectangle
-            // Coordinates taken from the image in the task description
-            minX = 0.85;
-            maxX = 2.1;
-            minY = 0.85;
-            maxY = 2.1;
-        } else {
-            // Coordinates taken from the image in the task description
-            minX = 0;
-            maxX = 3.15;
-            minY = 0;
-            maxY = 3.15;
-        }
-    }
-
-    double x1, y1, r1;
-    double x2, y2, r2;
-    double x3, y3, r3;
+    double x1,y1,r1;
+    double x2,y2,r2;
+    double x3,y3,r3;
 
     cin >> x1 >> y1 >> r1;
     cin >> x2 >> y2 >> r2;
     cin >> x3 >> y3 >> r3;
 
-    cout << monteCarloArea(x1, y1, r1, x2, y2, r2, x3, y3, r3, N, minX, maxX, minY, maxY);
-    return 0;
+    // Узкий прямоугольник
+    double s_minX = 0.85, s_maxX = 2.10;
+    double s_minY = 0.85, s_maxY = 2.10;
+
+    // Широкий прямоугольник
+    double b_minX = 0.0,  b_maxX = 3.15;
+    double b_minY = 0.0,  b_maxY = 3.15;
+
+    double area_small = monteCarlo(
+        x1,y1,r1,
+        x2,y2,r2,
+        x3,y3,r3,
+        N,
+        s_minX,s_maxX,
+        s_minY,s_maxY
+    );
+
+    double area_big = monteCarlo(
+        x1,y1,r1,
+        x2,y2,r2,
+        x3,y3,r3,
+        N,
+        b_minX,b_maxX,
+        b_minY,b_maxY
+    );
+
+    cout << N << "," << area_small << "," << area_big;
 }
